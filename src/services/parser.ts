@@ -32,7 +32,8 @@ export class Parser {
     deck: string,
     vault: string,
     note: string,
-    globalTags: string[] = []
+    globalTags: string[] = [],
+    cardPerHeaderEnabled: boolean
   ): Flashcard[] {
     const contextAware = this.settings.contextAwareMode;
     let cards: Flashcard[] = [];
@@ -44,18 +45,22 @@ export class Parser {
     }
 
     note = this.substituteObsidianLinks(`[[${note}]]`, vault);
-    cards = cards.concat(
-      this.generateCardsWithTag(file, headings, deck, vault, note, globalTags)
-    );
-    cards = cards.concat(
-      this.generateInlineCards(file, headings, deck, vault, note, globalTags)
-    );
-    cards = cards.concat(
-      this.generateSpacedCards(file, headings, deck, vault, note, globalTags)
-    );
-    cards = cards.concat(
-      this.generateClozeCards(file, headings, deck, vault, note, globalTags)
-    );
+    if (cardPerHeaderEnabled) {
+      cards = this.generateCardsPerHeader(file, headings, deck, vault, note, globalTags);
+    } else {
+      cards = cards.concat(
+        this.generateCardsWithTag(file, headings, deck, vault, note, globalTags)
+      );
+      cards = cards.concat(
+        this.generateInlineCards(file, headings, deck, vault, note, globalTags)
+      );
+      cards = cards.concat(
+        this.generateSpacedCards(file, headings, deck, vault, note, globalTags)
+      );
+      cards = cards.concat(
+        this.generateClozeCards(file, headings, deck, vault, note, globalTags)
+      );
+    }
 
     // Filter out cards that are fully inside a code block, a math block or a math inline block
     const codeBlocks = [...file.matchAll(this.regex.obsidianCodeBlock)];
@@ -426,6 +431,74 @@ export class Parser {
         originalQuestion,
         fields,
         reversed,
+        initialOffset,
+        endingLine,
+        tags,
+        inserted,
+        medias,
+        containsCode
+      );
+      cards.push(card);
+    }
+
+    return cards;
+  }
+
+  private generateCardsPerHeader(
+    file: string,
+    headings: any,
+    deck: string,
+    vault: string,
+    note: string,
+    globalTags: string[] = []
+  ) {
+    const contextAware = this.settings.contextAwareMode;
+    const cards: Flashcard[] = [];
+    const matches = [...file.matchAll(this.regex.cardsPerHeaderStyle)];
+
+    const embedMap = this.getEmbedMap();
+
+    for (const match of matches) {
+      const headingLevel = match[1].trim().length !== 0 ? match[1].length : -1;
+      // Match.index - 1 because otherwise in the context there will be even match[1], i.e. the question itself
+      const context = contextAware
+        ? this.getContext(headings, match.index - 1, headingLevel).concat([])
+        : "";
+
+      const originalQuestion = match[2].trim();
+      let question = contextAware
+        ? [...context, match[2].trim()].join(
+          `${this.settings.contextSeparator}`
+        )
+        : match[2].trim();
+      let answer = match[5].trim();
+      let medias: string[] = this.getImageLinks(question);
+      medias = medias.concat(this.getImageLinks(answer));
+      medias = medias.concat(this.getAudioLinks(answer));
+
+      answer = this.getEmbedWrapContent(embedMap, answer);
+
+      question = this.parseLine(question, vault);
+      answer = this.parseLine(answer, vault);
+
+      const initialOffset = match.index
+      const endingLine = match.index + match[0].length;
+      // TODO: Add inline tags support
+      const tags: string[] = globalTags;
+      const id: number = match[6] ? Number(match[6]) : -1;
+      const inserted: boolean = match[6] ? true : false;
+      const fields: any = { Front: question, Back: answer };
+      if (this.settings.sourceSupport) {
+        fields["Source"] = note;
+      }
+      const containsCode = this.containsCode([question, answer]);
+
+      const card = new Flashcard(
+        id,
+        deck,
+        originalQuestion,
+        fields,
+        false,
         initialOffset,
         endingLine,
         tags,

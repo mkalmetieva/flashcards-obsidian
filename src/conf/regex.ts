@@ -21,6 +21,7 @@ export class Regex {
   singleClozeCurly: RegExp;
   singleClozeHighlight: RegExp;
   clozeHighlight: RegExp;
+  cardsPerHeaderStyle: RegExp;
 
   embedBlock: RegExp;
 
@@ -94,6 +95,11 @@ export class Regex {
     
     this.singleClozeCurly = /((?:{)(?:(\d):?)?(.+?)(?:}))/g;
     this.singleClozeHighlight = /((?:==)(.+?)(?:==))/g;
+
+    // Mathes headers of level 3: ###
+    // https://regex101.com/r/skP2Hg/1
+    // TODO: Add tags support
+    this.cardsPerHeaderStyle = /(^### )([^\n]+)( *?\n+)()((?:[^\n#]\n*)*?(?=\^\d{13}|$))(?:\^(\d{13}))?/gm;
 
     // Matches any embedded block but the one with an used extension from the wikilinks
     this.embedBlock = /!\[\[(.*?)(?<!\.(?:png|jpg|jpeg|gif|bmp|svg|tiff|mp3|webm|wav|m4a|ogg|3gp|flac))\]\]/g;

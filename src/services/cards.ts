@@ -67,6 +67,11 @@ export class CardsService {
       deckName = this.settings.deck;
     }
 
+    let cardPerHeaderEnabled = false;
+    if (parseFrontMatterEntry(frontmatter, "card-per-header")) {
+      cardPerHeaderEnabled = true;
+    }
+
     try {
       this.anki.storeCodeHighlightMedias();
       await this.anki.createModels(
@@ -90,7 +95,8 @@ export class CardsService {
         deckName,
         vaultName,
         filePath,
-        globalTags
+        globalTags,
+        cardPerHeaderEnabled
       );
       const [cardsToCreate, cardsToUpdate, cardsNotInAnki] =
         this.filterByUpdate(ankiCards, cards);
