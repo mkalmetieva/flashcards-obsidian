@@ -116,7 +116,7 @@ export class CardsService {
       this.insertMedias(cards, sourcePath);
       await this.deleteCardsOnAnki(cardsToDelete, ankiBlocks);
       await this.updateCardsOnAnki(cardsToUpdate);
-      await this.insertCardsOnAnki(cardsToCreate, frontmatter, deckName);
+      await this.insertCardsOnAnki(cardsToCreate);
 
       // Update decks if needed
       const deckNeedToBeChanged = await this.deckNeedToBeChanged(
@@ -142,6 +142,7 @@ export class CardsService {
         }
       }
 
+      this.updateFrontmatter(frontmatter, deckName);
       if (!this.notifications.length) {
         this.notifications.push("Nothing to do. Everything is up to date");
       }
@@ -186,9 +187,7 @@ export class CardsService {
   }
 
   private async insertCardsOnAnki(
-    cardsToCreate: Card[],
-    frontmatter: FrontMatterCache,
-    deckName: string
+    cardsToCreate: Card[]
   ): Promise<number> {
     if (cardsToCreate.length) {
       let insertedCards = 0;
@@ -212,7 +211,6 @@ export class CardsService {
           card.reversed ? (total += 2) : total++;
         });
 
-        this.updateFrontmatter(frontmatter, deckName);
         this.writeAnkiBlocks(cardsToCreate);
 
         this.notifications.push(
@@ -227,31 +225,10 @@ export class CardsService {
   }
 
   private updateFrontmatter(frontmatter: FrontMatterCache, deckName: string) {
-    let newFrontmatter = "";
-    const cardsDeckLine = `cards-deck: ${deckName}\n`;
-    if (frontmatter) {
-      const oldFrontmatter: string = this.file.substring(
-        frontmatter.position.start.offset,
-        frontmatter.position.end.offset
-      );
-      if (!oldFrontmatter.match(this.regex.cardsDeckLine)) {
-        newFrontmatter =
-          oldFrontmatter.substring(0, oldFrontmatter.length - 3) +
-          cardsDeckLine +
-          "---";
-        this.totalOffset += cardsDeckLine.length;
-        this.file =
-          newFrontmatter +
-          this.file.substring(
-            frontmatter.position.end.offset,
-            this.file.length + 1
-          );
-      }
-    } else {
-      newFrontmatter = `---\n${cardsDeckLine}---\n\n`;
-      this.totalOffset += newFrontmatter.length;
-      this.file = newFrontmatter + this.file;
-    }
+    const activeFile = this.app.workspace.getActiveFile();
+    this.app.fileManager.processFrontMatter(activeFile, function (frontmatter) {
+      frontmatter["cards-deck"] = deckName;
+    });
   }
 
   private writeAnkiBlocks(cardsToCreate: Card[]) {
